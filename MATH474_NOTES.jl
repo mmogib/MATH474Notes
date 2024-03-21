@@ -15,6 +15,7 @@ begin
 	using LinearAlgebra, Random
 	import Symbolics as S
 	using NonlinearSolve
+	using ForwardDiff
 end
 
 # ╔═╡ fbbae78d-ad90-4ca7-9e97-cce7796eec48
@@ -463,6 +464,261 @@ s r+\boldsymbol{\lambda}^T \mathbf{x} \leq c & \text { for all } \mathbf{x} \in 
 
 It follows that ``s \neq 0``; for otherwise ``\boldsymbol{\lambda} \neq \mathbf{0}`` and then (15) would be violated for some ``\mathbf{x} \in E^n``. It also follows that ``s \geqslant 0`` since otherwise (16) would be violated by very negative values of ``r``. Hence, together we find ``s>0`` and by appropriate scaling we may take ``s=1``.
 """
+
+# ╔═╡ c3226575-e085-4c5a-8bdc-86b32d63c381
+md"#  8.5 INACCURATE LINE SEARCH"
+
+# ╔═╡ 61c5b24c-148c-4216-8740-820b9a579c20
+cm"""
+- Each iteration of a __line search method__ computes 
+	1. a search direction ``d_k`` and then 
+	2. decides how far to move along that direction with the positive scalar ``\alpha_k`` is called __the step length__. 
+- The iteration is given by
+```math
+x_{k+1}=x_k+\alpha_k d_k,
+```
+- The success of a line search method depends on effective choices of both the direction ``d_k`` and the step length ``\alpha_k``.
+
+- Most line search algorithms require ``d_k`` to be a descent direction-one for which 
+
+```math 
+d_k^T \nabla f_k<0
+``` 
+ - because this property guarantees that the function ``f`` can be reduced along this direction
+"""
+
+# ╔═╡ 5a629d84-6bbc-407b-8113-8f9066e6a50d
+cm"""
+- In computing the step length ``\alpha_k``, we face a tradeoff. 
+	- We would like to choose ``\alpha_k`` to give a substantial reduction of ``f``, but at the same time 
+	- we do not want to spend too much time making the choice. The ideal choice would be the global minimizer of the univariate function ``\phi(\cdot)`` defined by
+```math
+\phi(\alpha)=f\left(x_k+\alpha d_k\right), \quad \alpha>0,
+```
+ - but in general, it is too expensive to identify this value (see Figure below). 
+
+<div class="img-container">
+
+$(Resource("https://www.dropbox.com/scl/fi/jl0sryw6hj3irjjdyxrap/sec8_5_1.png?rlkey=hdwkndkdizxn36zucklubmyg2&raw=1"))
+</div>
+
+- To find even a local minimizer of ``\phi`` to moderate precision generally requires too many evaluations of the objective function ``f`` and possibly the gradient ``\nabla f``. More practical strategies perform an inexact line search to identify a step length that achieves adequate reductions in ``f`` at minimal cost.
+- To avoid this behavior we need to enforce __a sufficient decrease condition__, a concept we discuss next.
+"""
+
+# ╔═╡ 53cc51df-2f9a-4072-b250-4cc18bfad074
+md"## The Armijo condition"
+
+# ╔═╡ c1b2206b-4a39-4c50-b115-2e8c8ca2527e
+cm"""
+A popular inexact line search condition stipulates that ``\alpha_k`` should first of all give __sufficient decrease__ in the objective function ``f``, as measured by the following inequality:
+
+```math
+f\left(x_k+\alpha d_k\right) \leq f\left(x_k\right)+c_1 \alpha \nabla f_k^T d_k. \tag{Sufficient Descrease}
+```
+or
+```math
+\phi(\alpha) \leqslant \phi(0)+c_1  \phi^{\prime}(0) \alpha 
+```
+
+for some constant ``c_1 \in(0,1)`` (In practice ``c_1=0.0001``). In other words, the reduction in ``f`` should be proportional to both the step length ``\alpha_k`` and the directional derivative ``\nabla f_k^T d_k``. 
+
+<div class="img-container">
+
+$(Resource("https://www.dropbox.com/scl/fi/n4vnw1haq1fxrt0d3stty/sec8_5_2-Copy.png?rlkey=oggk17yze836fb5ceayau9muu&raw=1"))
+
+</div>
+
+"""
+
+# ╔═╡ aa2ab2be-07b6-4b79-b133-622d0061b0b2
+md"## Wolfe Conditions"
+
+# ╔═╡ c6541c9e-2d9c-429d-8429-ca3c227b8e52
+cm"""
+- The sufficient decrease condition is __not enough by itself__ to ensure that the algorithm makes reasonable progress because.
+- It is satisfied for all sufficiently small values of ``\alpha``. 
+- To rule out unacceptably __short steps__ we introduce a second requirement, called __the curvature condition__, which requires ``\alpha_k`` to satisfy
+```math
+\nabla f\left(x_k+\alpha_k d_k\right)^T d_k \geq c_2 \nabla f_k^T d_k\tag{Curvature}
+```
+or
+```math
+\phi^{\prime}(\alpha) \geqslant c_2 \phi^{\prime}(0)
+```
+for some constant ``c_2 \in\left(c_1, 1\right)``, where ``c_1`` is the constant from ``(\text{Sufficient Descrease})``. (In practice ``c_2=0.9``) 
+- The curvature condition ensures that the slope of ``\phi`` at ``\alpha_k`` is greater than ``c_2`` times the initial slope ``\phi^{\prime}(0)``. This makes sense because if the slope ``\phi^{\prime}(\alpha)``  is strongly negative, we have an indication that we can reduce f significantly by moving
+ further along the chosen direction.
+<div class="img-container">
+
+$(Resource("https://www.dropbox.com/scl/fi/09rrryopt8gve3s9tzjcu/sec8_5_3.png?rlkey=ctb9bnr0hq6mahbukjzhh1k1z&raw=1"))
+
+</div>
+
+- The two conditions ``(\text{Sufficient Descrease})`` and ``(\text{Curvature})`` are called __Wolfe Conditions__. That is
+
+```math
+\begin{array}{lcl}
+f\left(x_k+\alpha d_k\right) &\leq& f\left(x_k\right)+c_1 \alpha \nabla f_k^T d_k\\
+\nabla f\left(x_k+\alpha_k d_k\right)^T d_k &\geq& c_2 \nabla f_k^T d_k
+\end{array}
+```
+
+with ``0 < c_1 < c_2 <1``.
+<div class="img-container">
+
+$(Resource("https://www.dropbox.com/scl/fi/sncy4g0t2r85t1kyl2rgw/sec8_5_4.png?rlkey=4zptb5x65hk2pyb7z5molelr1&raw=1"))
+
+</div>
+
+"""
+
+# ╔═╡ 80901550-0b7f-4cd9-895e-23b0a5095c75
+md"## THE GOLDSTEIN CONDITIONS"
+
+# ╔═╡ 9e7fd16d-1c37-4bd9-8b6c-f09774ce5f5e
+cm"""
+
+Like the Wolfe conditions, the Goldstein conditions ensure that the step length ``\alpha`` achieves sufficient decrease but is not too short. The Goldstein conditions can also be stated as a pair of inequalities, in the following way:
+```math
+f\left(x_k\right)+(1-c) \alpha_k \nabla f_k^T d_k \leq f\left(x_k+\alpha_k d_k\right) \leq f\left(x_k\right)+c \alpha_k \nabla f_k^T d_k,
+```
+with ``0 < c < 1 / 2``. The second inequality is the sufficient decrease condition (3.4), whereas the first inequality is introduced to control the step length from below; 
+<div class="img-container">
+
+$(Resource("https://www.dropbox.com/scl/fi/1jrx0jlixtsbkxddez2q3/sec8_5_5.png?rlkey=9qzrewnivuxdata7586vznha7&raw=1"))
+
+</div>
+
+"""
+
+# ╔═╡ 36a50ff2-85f1-4323-ad57-1166c77ba291
+md"##  SUFFICIENT DECREASE AND BACKTRACKING"
+
+# ╔═╡ 8aa4ea52-6406-4f33-92d1-5ff7b72b56a5
+cm"""
+### Algorithm (Backtracking Line Search).
+```math
+\begin{aligned}
+& \text { Choose } \bar{\alpha}>0, \rho \in(0,1), c \in(0,1) \text {; Set } \alpha \leftarrow \bar{\alpha} \text {; } \\
+& \text { repeat until } f\left(x_k+\alpha d_k\right) \leq f\left(x_k\right)+c \alpha \nabla f_k^T d_k \\
+& \qquad \alpha \leftarrow \rho \alpha \text {; } \\
+& \text { end (repeat) } \\
+& \text { Terminate with } \alpha_k=\alpha \text {. }
+\end{aligned}
+```
+"""
+
+# ╔═╡ 65be3f3a-2b9b-4bc9-b470-5de68d23f0a5
+begin
+	Random.seed!(123)
+	function pltit(p,x,f,i=1)
+		scatter(p,[x[1]],[x[2]],label=:none, annotation=[(x[1],x[2]+0.5,text(L"x_{%$i},%$(round(f(x),digits=2))",8))])
+	end
+	
+	function search_direction(f,x)
+		-ForwardDiff.gradient(f,x)
+	end
+	
+	function backtracking(f,xk,dk)
+		ρ,c = 0.5 , 0.0001
+		fk = f(xk)
+		gk = ForwardDiff.gradient(f,xk)
+		∇fkdk = dot(gk,dk)
+		α = 1
+		while f(xk+α*dk) > fk + c*α*∇fkdk
+			α = ρ*α
+		end
+		α
+	end
+	function rosenbrock(x, α=100)
+		n = length(x)
+		sum(α * (x[i+1] - x[i]^2)^2 + (1 - x[i])^2 for i ∈ 1:2:n-1)
+	end
+	function f1(n=2)
+		U = [1 -1;2 3]
+		Q = U*diagm([2,3])*inv(U)
+		b = [2,-3]
+		return Dict(:fn=>(x::Vector{<:Number})->0.5*(Q*x⋅x) - x⋅b,:xstar=>Q\b)
+	end
+end
+
+# ╔═╡ 4b869fe6-03c6-43c8-9d4c-1fa81e607257
+
+
+# ╔═╡ f05cd93a-bcd4-43a2-9220-e5a39c2a47d6
+let
+	n=2
+	x = -10:0.1:10
+	y = copy(x)
+	f1d =f1()
+	# f=f1d[:fn]
+	f= rosenbrock
+	p = contour(x,y,(x,y)->f([x,y]))
+	# xstar = f1d[:xstar]
+	xstar = ones(2)
+	p = scatter(p,[xstar[1]],[xstar[2]],label=L"(%$(xstar[1]),%$(xstar[2])),%$(f(xstar))")
+	x = 5ones(n)
+	p = pltit(p,x,f)
+	ϵ = 1e-6
+	g(x)=ForwardDiff.gradient(f,x)
+	# counter = 1
+	# xvalues = Vector{Vector{Float64}}(undef,1000)
+	# xvalues[1] = x
+	# while norm(g(x)) > ϵ
+	# 	d = search_direction(f,x)
+	# 	α = backtracking(f,x,d)
+	# 	x = x +α*d
+	# 	xvalues[counter+1] = x
+	#     p = pltit(p,x,f,counter+1)
+	# 	if counter>=999
+	# 		break
+	# 	end
+	# 	counter += 1
+	# end
+	anims = @animate for i in 1:100 
+		if norm(g(x)) <= ϵ
+			break
+		end
+		d = search_direction(f,x)
+		α = backtracking(f,x,d)
+		x = x + α*d
+		pltit(p,x,f,i+1)
+	end;
+	gif(anims,"anim.gif", fps = 1)
+	
+	# x1=[5,5]
+	# p = pltit(p,x1)
+	# function xnew(x,d)
+	# 	αk = backtracking(f,g,x,d)
+	# 	x+αk*d
+	# end
+	# d1 = -g(x1)
+	# # backtracking(f,g,x1,d1)	
+	# x2=xnew(x1,d1)
+	# p = pltit(p,x2,2)
+	# # # f.([xstar,x2])
+	# x3=xnew(x2,-g(x2))
+	# p = pltit(p,x3,3)
+	# # # f.([xstar,x2,x3])
+	# p = plot(p,xlims=(-2,-1))
+	# x4=xnew(x3,-g(x3))
+	# p = pltit(p,x4,4)
+	# # # f.([xstar,x2,x3,x4])
+	# x5=xnew(x4,-g(x4))
+	# p = pltit(p,x5,5)
+	# x6=xnew(x5,-g(x5))
+	# p = pltit(p,x6,6)
+	# # norm(Q*x5-b)
+	# # ev,evv = eigen(Q);
+	# # λmin,λmax = minimum(ev),maximum(ev)
+	# # cn =λmax/λmin
+	# # fac =((λmax-λmin)/(λmin+λmax))^2
+	# # f.([xstar,x2,x3,x4])
+	# # Ek(x)=0.5*dot(Q*(x-xstar),x-xstar)
+	# # Ek(x3)/Ek(x2), fac
+	
+end
 
 # ╔═╡ 72cf0a7d-36fa-4533-9257-ed4f56a12374
 md"# 8.6 THE METHOD OF STEEPEST DESCENT"
@@ -913,6 +1169,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 CommonMark = "a80b9123-70ca-4bc0-993e-6e3bcb318db6"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 HiGHS = "87dc4568-4c63-4d18-b0c0-bb2238e4078b"
 HypertextLiteral = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
 Ipopt = "b6b21f68-93f8-5de0-b562-5493be1d77c9"
@@ -929,6 +1186,7 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 [compat]
 Colors = "~0.12.10"
 CommonMark = "~0.8.12"
+ForwardDiff = "~0.10.36"
 HiGHS = "~1.8.1"
 HypertextLiteral = "~0.9.5"
 Ipopt = "~1.6.1"
@@ -947,7 +1205,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.10.2"
 manifest_format = "2.0"
-project_hash = "005f433cd95dc1a94a6574893ec9125a98e34acd"
+project_hash = "1c8a7d536cfb6b7ce4b4773172a32f14b3d4f583"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "41c37aa88889c171f1300ceac1313c06e891d245"
@@ -3116,6 +3374,20 @@ version = "1.4.1+1"
 # ╟─111cfd65-7dec-4c4b-aa7d-f7c53a47f3a6
 # ╟─e2986fb8-ac1c-4591-aa7d-57919815b243
 # ╟─4af8b8c2-ef21-4143-ad6c-f056c90f8854
+# ╟─c3226575-e085-4c5a-8bdc-86b32d63c381
+# ╟─61c5b24c-148c-4216-8740-820b9a579c20
+# ╟─5a629d84-6bbc-407b-8113-8f9066e6a50d
+# ╟─53cc51df-2f9a-4072-b250-4cc18bfad074
+# ╟─c1b2206b-4a39-4c50-b115-2e8c8ca2527e
+# ╟─aa2ab2be-07b6-4b79-b133-622d0061b0b2
+# ╟─c6541c9e-2d9c-429d-8429-ca3c227b8e52
+# ╟─80901550-0b7f-4cd9-895e-23b0a5095c75
+# ╟─9e7fd16d-1c37-4bd9-8b6c-f09774ce5f5e
+# ╟─36a50ff2-85f1-4323-ad57-1166c77ba291
+# ╟─8aa4ea52-6406-4f33-92d1-5ff7b72b56a5
+# ╠═65be3f3a-2b9b-4bc9-b470-5de68d23f0a5
+# ╠═4b869fe6-03c6-43c8-9d4c-1fa81e607257
+# ╠═f05cd93a-bcd4-43a2-9220-e5a39c2a47d6
 # ╟─72cf0a7d-36fa-4533-9257-ed4f56a12374
 # ╟─c9a1b17b-8cb2-4025-96b1-0064e090c5f8
 # ╟─9884c49e-4b4e-4f01-894e-0453710ac997
