@@ -802,8 +802,359 @@ let
 	
 end
 
+# ╔═╡ 76874d07-9a1a-4b11-9113-9a64634d0d60
+md"# 8.8 NEWTON’S METHOD"
+
+# ╔═╡ 5493b23d-3c41-4eac-beed-7d6fa3be7a44
+cm"""
+- The idea behind Newton's method is tha near ``\mathbf{x}_k`` we can approximate ``f`` by the truncated Taylor series
+```math
+f(\mathbf{x}) \simeq f\left(\mathbf{x}_k\right)+\boldsymbol{\nabla} f\left(\mathbf{x}_k\right)\left(\mathbf{x}-\mathbf{x}_k\right)+\frac{1}{2}\left(\mathbf{x}-\mathbf{x}_k\right)^T \mathbf{F}\left(\mathbf{x}_k\right)\left(\mathbf{x}-\mathbf{x}_k\right) .
+```
+
+- The right-hand side is minimized at
+```math
+\mathbf{x}_{k+1}=\mathbf{x}_k-\left[\mathbf{F}\left(\mathbf{x}_k\right)\right]^{-1} \boldsymbol{\nabla} f\left(\mathbf{x}_k\right)^T,
+```
+ - this equation is the pure form of Newton's method.
+"""
+
+# ╔═╡ 99dd204a-7651-491b-952e-2bc63df29f9d
+md"## Order Two Convergence"
+
+# ╔═╡ 13ab542f-3479-43eb-b74e-89ca6bc43d07
+let
+	x0 = [0,-2000]
+	gk(f,x) = ForwardDiff.gradient(f,x)
+	Hk(f,x) = ForwardDiff.hessian(f,x)
+	x = copy(x0)
+	gkx=gk(rosenbrock,x0)
+	# counter = 0
+	# while norm(gkx)>1e-6
+	# 	x = x - Hk(rosenbrock,x)\gkx
+	# 	gkx=gk(rosenbrock,x)
+	# 	counter += 1
+	# end
+	# x, counter
+	xs = -20:0.1:25
+	ys = copy(xs)
+	p = contour(xs,ys,(x,y)->rosenbrock([x,y]))
+	xstar = ones(2)
+	p = scatter(p,[xstar[1]],[xstar[2]],label=L"(%$(xstar[1]),%$(xstar[2])),%$(rosenbrock(xstar))")
+	# p = pltit(p,x0,rosenbrock)
+	i = 1
+	animation = @animate while norm(gkx)>1e-6 
+		i += 1
+		x = x - Hk(rosenbrock,x)\gkx
+		gkx=gk(rosenbrock,x)
+		pltit(p,x,rosenbrock,i)
+	end
+	Plots.gif(animation,fps=1)
+end
+
+# ╔═╡ a6553f8f-a69c-4bb2-ad1f-81b0392735ba
+md"""## Modifications 
+### 1. Damping
+```math
+\mathbf{x}_{k+1}=\mathbf{x}_k-\alpha_k\left[\mathbf{F}\left(\mathbf{x}_k\right)\right]^{-1} \boldsymbol{\nabla} f\left(\mathbf{x}_k\right)^T
+```
+### 2. Positive definiteness.
+```math
+\mathbf{x}_{k+1}=\mathbf{x}_k-\alpha \mathbf{M}_k \mathbf{g}_k,
+```
+where 
+- ``\mathbf{M}_k`` is an ``n \times n`` matrix, 
+- ``\alpha`` is a positive search parameter, and 
+- ``\mathbf{g}_k=\boldsymbol{\nabla} f\left(\mathbf{x}_k\right)^T``.
+###  3. Backtracking
+### 4. General Problems
+ In practice, Newton’s method must be modified to accommodate the possible nonpositive definiteness at regions remote from the solution.
+A common approach is to take 
+```math
+\mathbf{M}_k=\left[\varepsilon_k \mathbf{I}+\mathbf{F}\left(\mathbf{x}_k\right)\right]^{-1}
+``` 
+for some non-negative value of ``\varepsilon_k``. 
+
+This can be regarded as a kind of compromise between steepest descent ( ``\varepsilon_k`` very large) and Newton's method ``\left(\varepsilon_k=0\right)``. There is always an ``\varepsilon_k`` that makes ``\mathbf{M}_k`` positive definite. We shall present one modification of this type.
+"""
+
+# ╔═╡ a4f385ff-2b19-4865-9a77-233a47e323c1
+md"""# Revision:
+Consider 
+```math 
+\min \; 5 x^2+5 y^2-x y-11 x+11 y+11.
+```
+1. Critical values
+2. Check First-Order and Second-Order
+3. Classify the points
+4. Convexity?
+5. Steepest Descent Iterations with some predetermined error tolerance.
+"""
+
+# ╔═╡ 4488ec7f-d21a-4b82-8b3c-4338623efe0c
+let
+	f(x::Vector{<:Number}) = 5x[1]^2 + 5x[2]^2 - x[1]*x[2]-11x[1]+11x[2]+11
+	g(x::Vector{<:Number}) = vcat(10x[1]-x[2]-11,10x[2]-x[1]+11)
+	F(x::Vector{<:Number}) = hcat(vcat(10,-1),vcat(-1,10))
+
+	Random.seed!(474)
+	x0 = ones(2)
+	f(x0), g(x0), ForwardDiff.gradient(f,x0)
+	A , b = [10 -1;-1 10], [11; -11]
+	cv = A\b
+	g(cv)
+	egvalues, egvecs = eigen(F(cv))
+	F(cv)*egvecs[:,2]==egvalues[2]*egvecs[:,2]
+
+	# x1 = x0 - α*g(x0)
+	# f(x1)< f(x0)
+	function backtrack(f,g,x,ϵ)
+		c1 = 0.001
+		α=1
+		ρ = 0.5
+		fx = f(x)
+		dg = c1*dot(g(x),g(x))
+		while f(x-α*g(x))-fx+α*dg>ϵ
+			α = ρ*α
+		end
+		α
+	end
+	
+	ϵ=1e-8
+	c = 0
+	while norm(g(x0))>ϵ
+		a = backtrack(f,g,x0,ϵ)
+		x0 = x0 -a*g(x0)
+		c+=1
+		if c>100
+			break
+		end
+	end
+	x0, c
+end
+
+# ╔═╡ 06417793-dc4b-4dda-a75b-f9fd9373965f
+md"# 10.1 MODIFIED NEWTON METHOD"
+
+# ╔═╡ 72049611-b9fa-4df0-9cec-c991c1c48254
+cm"""
+Consider 
+```math 
+\min \quad f(\mathbf{x})
+```
+Let ``x_0\in \mathbb{R}^n`` be an initial point, and consider the iteration
+```math
+\mathbf{x}_{k+1}=\mathbf{x}_k-\alpha_k \mathbf{S}_k \nabla f\left(\mathbf{x}_k\right),
+```
+where ``\mathbf{S}_k`` is a symmetric ``n \times n`` matrix and where, as usual, ``\alpha_k`` is chosen to minimize ``f\left(\mathbf{x}_{k+1}\right)``. 
+
+- If ``\mathbf{S}_k = \mathbf{I}``  we obtain __steepest descent method__. 
+- If ``\mathbf{S}_k = F(x)^{-1}``  we obtain __Newton's method__. 
+- If ``\mathbf{S}_k = \mathbf{H}(x)`` , where ``\mathbf{H}(x)`` is an approximation of the inverse of the Hessian matrix, we obtain __Quasi-Newton's method__. 
+"""
+
+# ╔═╡ 785ca05d-7154-4ed2-aedd-70fa047fb566
+md"# 10.2 CONSTRUCTION OF THE INVERSE"
+
+# ╔═╡ c11a5841-0625-482e-a11b-457ed9e9cc9e
+cm"""
+Let ``f`` be a function on ``E^n`` that has continuous second partial derivatives. If for two points ``\mathbf{x}_{k+1}, \mathbf{x}_k`` we define ``\mathbf{g}_{k+1}=\boldsymbol{\nabla} f\left(\mathbf{x}_{k+1}\right)^T, \mathbf{g}_k=\boldsymbol{\nabla} f\left(\mathbf{x}_k\right)^T`` and ``\mathbf{p}_k=`` ``\mathbf{x}_{k+1}-\mathbf{x}_k``, then
+```math
+\mathbf{g}_{k+1}-\mathbf{g}_k \cong \mathbf{F}\left(\mathbf{x}_k\right) \mathbf{p}_k .
+```
+
+If the Hessian, ``\mathbf{F}``, is constant, then we have
+```math
+\mathbf{q}_k \equiv \mathbf{g}_{k+1}-\mathbf{g}_k=\mathbf{F p}_k,
+```
+and we see that evaluation of the gradient at two points gives information about ``\mathbf{F}``. 
+- If ``n`` linearly independent directions ``\mathbf{p}_0, \mathbf{p}_1, \mathbf{p}_2, \ldots, \mathbf{p}_{n-1}`` and the corresponding ``\mathbf{q}_k`` 's are known, then ``\mathbf{F}`` is uniquely determined. Indeed, letting ``\mathbf{P}`` and ``\mathbf{Q}`` be the ``n \times n`` matrices with columns ``\mathbf{p}_k`` and ``\mathbf{q}_k`` respectively, we have
+```math
+\mathbf{F}=\mathbf{Q P}^{-1} 
+```
+- If ``\mathbf{F}`` were constant ``\mathbf{H}_{k+1}`` would satisfy
+```math
+\mathbf{H}_{k+1} \mathbf{q}_i=\mathbf{p}_i, \quad 0 \leqslant i \leqslant k .\tag{*}
+```
+
+- After ``n`` linearly independent steps we would then have ``\mathbf{H}_n=\mathbf{F}^{-1}``.
+"""
+
+# ╔═╡ eddd82fc-cc56-4fd3-8d11-2ecd4f836ad3
+md"## Rank One Correction (SR-1)"
+
+# ╔═╡ 7b5bf371-b08b-4b46-83c9-db1e353476b3
+let
+	zk=[1,2,3]
+	rank(zk*zk')
+end
+
+# ╔═╡ 6ebe6b08-1977-439a-9f69-caae22b7d924
+cm"""
+Since ``\mathbf{F}`` and ``\mathbf{F}^{-1}`` are symmetric, it is natural to require that ``\mathbf{H}_k``, the approximation to ``\mathbf{F}^{-1}``, be symmetric. We investigate the possibility of defining a recursion of the form
+```math
+\mathbf{H}_{k+1}=\mathbf{H}_k+a_k \mathbf{z}_k \mathbf{z}_k^T, \tag{**}
+```
+Setting ``i`` equal to ``k`` in (*) and substituting (**) we obtain
+```math
+\mathbf{p}_k=\mathbf{H}_{k+1} \mathbf{q}_k=\mathbf{H}_k \mathbf{q}_k+a_k \mathbf{z}_k \mathbf{z}_k^T \mathbf{q}_k .\tag{$\triangle$}
+```
+
+Taking the inner product with ``\mathbf{q}_k`` we have
+```math
+\mathbf{q}_k^T \mathbf{p}_k-\mathbf{q}_k^T \mathbf{H}_k \mathbf{q}_k=a_k\left(\mathbf{z}_k^T \mathbf{q}_k\right)^2 .\tag{$\square$}
+```
+
+On the other hand, using (``\triangle``) we may write (**) as
+```math
+\mathbf{H}_{k+1}=\mathbf{H}_k+\frac{\left(\mathbf{p}_k-\mathbf{H}_k \mathbf{q}_k\right)\left(\mathbf{p}_k-\mathbf{H}_k \mathbf{q}_k\right)^T}{a_k\left(\mathbf{z}_k^T \mathbf{q}_k\right)^2},
+```
+which in view of (``\square``) leads finally to
+```math
+\mathbf{H}_{k+1}=\mathbf{H}_k+\frac{\left(\mathbf{p}_k-\mathbf{H}_k \mathbf{q}_k\right)\left(\mathbf{p}_k-\mathbf{H}_k \mathbf{q}_k\right)^T}{\mathbf{q}_k^T\left(\mathbf{p}_k-\mathbf{H}_k \mathbf{q}_k\right)} .
+```
+"""
+
+# ╔═╡ e5f0dba1-b76c-4481-9bde-6ab1a61088ed
+let
+	# Define the function and its gradient
+	f(x) = x[1]^2 + x[2]^2
+	g_f(x) = [2*x[1], 2*x[2]]
+	
+	# Initial guess for Hessian approximation
+	H = I(2)
+	
+	# Initial point
+	x_k = [-1.0, 2.0]
+	
+	# SR1 Update function
+	function sr1_update(H, x_k, x_k1, g_f)
+	    p_k = x_k1 - x_k
+	    q_k = g_f(x_k1) - g_f(x_k)
+	    Hq = H * q_k
+	    u = p_k - Hq
+	    denominator = u' * q_k
+	    if abs(denominator) > 1e-6  # Check to avoid division by zero or very small numbers
+	        H += (u * u') / denominator
+	    end
+	    return H
+	end
+	
+	# SR1 Update iteration
+	for i in 1:10
+	    x_k1 = x_k - H * g_f(x_k)  # Quasi-Newton step
+	    H = sr1_update(H, x_k, x_k1, g_f)  # SR1 Hessian approximation update
+	    x_k = x_k1  # Update current point
+	    println("Iteration $i: x_k = $x_k")
+	end
+	
+	println("Approximate Inverse Hessian after updates:")
+	println(H)
+	H*[2 0;0 2]
+end
+
+# ╔═╡ 009f418a-e5ac-4a27-b201-f3ae09b37f77
+md"# 11.1 CONSTRAINTS"
+
+# ╔═╡ 19a39fd1-bfb9-491a-91b0-32e14305e5a3
+cm"""
+We deal with general nonlinear programming problems of the form
+```math
+\begin{array}{lll}
+\operatorname{minimize} & f(\mathbf{x}) & \\
+\text { subject to } & h_1(\mathbf{x})=0 & g_1(\mathbf{x}) \leqslant 0 \\
+& h_2(\mathbf{x})=0 & g_2(\mathbf{x}) \leqslant 0 \\
+& \vdots & \vdots \\
+& h_m(\mathbf{x})=0 & g_p(\mathbf{x}) \leqslant 0 \\
+& \mathbf{x}, \in \Omega \subset E^n,
+\end{array}
+```
+where ``m \leqslant n`` and the functions ``f, h_i, i=1,2, \ldots, m`` and ``g_j, j=1,2, \ldots, p`` are continuous, and usually assumed to possess continuous second partial derivatives. 
+
+- For notational simplicity, we introduce the vector-valued functions ``\mathbf{h}=\left(h_1, h_2, \ldots, h_m\right)`` and ``\mathbf{g}=\left(g_1, g_2, \ldots, g_p\right)`` and rewrite (1) as
+```math
+\begin{array}{ll}
+\text { minimize } & f(\mathbf{x}) \\
+\text { subject to } & \mathbf{h}(\mathbf{x})=\mathbf{0}, \mathbf{g}(\mathbf{x}) \leqslant \mathbf{0} \\
+& \mathbf{x} \in \Omega .
+\end{array}
+```
+
+- The constraints ``\mathbf{h}(\mathbf{x})=\mathbf{0}, \mathbf{g}(\mathbf{x}) \leqslant \mathbf{0}`` are referred to as __functional constraints__, while the constraint ``\mathbf{x} \in \Omega`` is __a set constraint__. As before we continue to de-emphasize the set constraint, assuming in most cases that either ``\Omega`` is the whole space ``E^n`` or that the solution to (2) is in the interior of ``\Omega``. A point ``\mathbf{x} \in \Omega`` that satisfies all the functional constraints is said to be feasible.
+"""
+
+# ╔═╡ cc8e5534-b2fa-4a71-b5f3-ac8be99e4cfa
+md"# 11.2 TANGENT PLANE"
+
+# ╔═╡ abf84498-d518-4b49-8f01-f414046c63f7
+cm"""
+A set of equality constraints on ``E^n``
+```math
+\begin{gathered}
+h_1(\mathbf{x})=0 \\
+h_2(\mathbf{x})=0 \\
+\vdots \\
+h_m(\mathbf{x})=0
+\end{gathered}
+```
+defines a subset of ``E^n`` which is best viewed as a **hypersurface**.
+
+"""
+
+# ╔═╡ 1009609c-cd68-4459-8d97-03d650f9a26e
+md"# 11.3 FIRST-ORDER NECESSARY CONDITIONS (EQUALITY CONSTRAINTS)"
+
+# ╔═╡ 7c080ca2-2ff5-420e-9938-df985c84ba66
+cm"""
+__Remark__
+
+It is convenient to introduce the Lagrangian associated with the constrained problem, defined as
+```math
+l(\mathbf{x}, \boldsymbol{\lambda})=f(\mathbf{x})+\boldsymbol{\lambda}^T \mathbf{h}(\mathbf{x}) .
+```
+
+The necessary conditions can then be expressed in the form
+```math
+\begin{aligned}
+& \nabla_{\mathbf{x}} l(\mathbf{x}, \boldsymbol{\lambda})=\mathbf{0} \\
+& \nabla_{\boldsymbol{\lambda}} l(\mathbf{x}, \boldsymbol{\lambda})=\mathbf{0},
+\end{aligned}
+```
+the second of these being simply a restatement of the constraints.
+
+"""
+
+# ╔═╡ e676c729-88f8-4198-9a3e-501af9b4a9e2
+md"# 11.4 EXAMPLES"
+
+# ╔═╡ 74b08967-60bb-4e07-afbe-48c79b3a7bb6
+let
+	# c=600
+	# model = Model(Ipopt.Optimizer)
+	# set_silent(model)
+	# @variable(model,x>=0.01)
+	# @variable(model,y>=0.01)
+	# @variable(model,z>=0.01)
+	# @NLconstraint(model,x*y+y*z+x*z==c/2)
+	# @NLobjective(model,Max,x*y*z)
+	# optimize!(model)
+	# value.(x),
+	# value.(y),
+	# value.(z)
+	# # solution_summary(model)
+end
+
 # ╔═╡ 0a350a34-3c76-4de1-ad48-c05b0d7cefee
 begin
+	function post_img(img::String,w=500)
+		res=Resource(img,:width=>w)
+		cm"""
+<div class="img-container">
+
+$(res)
+
+</div>"""
+	end
 	function poolcode()
 		cm"""
 <div class="img-container">
@@ -1163,6 +1514,165 @@ If there is a ``\boldsymbol{\lambda}`` such that ``\mathbf{x}^* \in \Omega`` sol
 $(ebl())
 """
 
+
+# ╔═╡ b1212331-af7b-4e70-a37a-01bd0d9b83bb
+cm"""
+$(bbl("Theorem","(Newton's method)")) 
+Let ``f \in C^3`` on ``E^n``, and assume that at the local minimum point ``\mathbf{x}^*``, the Hessian ``\mathbf{F}\left(\mathbf{x}^*\right)`` is positive definite. Then if started sufficiently close to ``\mathbf{x}^*``, the points generated by Newton's method converge to ``\mathbf{x}^*``. The order of convergence is at least two.
+$(ebl())
+
+__Proof__:
+```math
+\begin{aligned}\left|\mathbf{x}_{k+1}-\mathbf{x}^*\right| & =\left|\mathbf{x}_k-\mathbf{x}^*-\mathbf{F}\left(\mathbf{x}_k\right)^{-1} \boldsymbol{\nabla} f\left(\mathbf{x}_k\right)^T\right| \\ & =\left|\mathbf{F}\left(\mathbf{x}_k\right)^{-1}\left[\boldsymbol{\nabla} f\left(\mathbf{x}^*\right)^T-\boldsymbol{\nabla} f\left(\mathbf{x}_k\right)^T-\mathbf{F}\left(\mathbf{x}_k\right)\left(\mathbf{x}^*-\mathbf{x}_k\right)\right]\right| \\ & \leqslant\left|\mathbf{F}\left(\mathbf{x}_k\right)^{-1}\right| \beta_2\left|\mathbf{x}_k-\mathbf{x}^*\right|^2 \\ & \leqslant \beta_1 \beta_2\left|\mathbf{x}_k-\mathbf{x}^*\right|^2<\left|\mathbf{x}_k-\mathbf{x}^*\right| .\end{aligned}
+```
+"""
+
+# ╔═╡ 2d1ffc90-0764-4924-abcf-b6bb0459206d
+cm"""
+$(ex(1))
+Solve the Rosenbrock problem
+```math
+\min \quad f(x)=\sum_{i=1}^{n / 2}\left[\alpha\left(x_{2 i}-x_{2 i-1}^2\right)^2+\left(1-x_{2 i-1}\right)^2\right]
+```
+
+"""
+
+# ╔═╡ 4c488e2a-45e1-4c61-9b51-0fd141f073bc
+cm"""
+$(bth(""))
+Let ``\mathbf{F}`` be a fixed symmetric matrix and suppose that ``\mathbf{p}_0, \mathbf{p}_1``, ``\mathbf{p}_2, \ldots, \mathbf{p}_k`` are given vectors. Define the vectors ``\mathbf{q}_i=\mathbf{F p}_i, i=0,1,2, \ldots, k``. Starting with any initial symmetric matrix ``\mathbf{H}_0`` let
+```math
+\mathbf{H}_{i+1}=\mathbf{H}_i+\frac{\left(\mathbf{p}_i-\mathbf{H}_i \mathbf{q}_i\right)\left(\mathbf{p}_i-\mathbf{H}_i \mathbf{q}_i\right)^T}{\mathbf{q}_i^T\left(\mathbf{p}_i-\mathbf{H}_i \mathbf{q}_i\right)} .
+```
+
+Then
+```math
+\mathbf{p}_i=\mathbf{H}_{k+1} \mathbf{q}_i \text { for } i \leqslant k .
+```
+$(eth())
+"""
+
+# ╔═╡ 7fc4b721-05c6-461d-8ca7-e12e05705c88
+cm"""
+$(bbl("Definition"))
+A constraint ``g_i(\mathbf{x}) \leq 0`` is said to be ``\textit{active}`` at a feasible point ``\mathbf{x}`` if ``g_i(\mathbf{x}) = 0`` and ``\textit{inactive}`` if ``g_i(\mathbf{x}) < 0``. By convention, an equality constraint ``h_i(\mathbf{x}) = 0`` is always considered as ``\textit{active} a``t any feasible point.
+$(ebl())
+
+- The constraints active at a feasible point ``\mathbf{x}`` restrict the domain of feasibility in neighborhoods of ``\mathbf{x}``, while the other, inactive constraints, have no influence in neighborhoods of ``\mathbf{x}``. __In studying the properties of a local minimum point, attention can be restricted to the active constraints.__
+
+- It is clear that, if it were known a priori which constraints were active at the solution to the optimization problem, the solution would be a local minimum point of the problem defined by ignoring the inactive constraints and treating all active constraints as equality constraints.
+
+
+"""
+
+# ╔═╡ 883994a7-c5b8-445d-8ea3-c93800404231
+cm"""
+$(bbl("Definition",""))
+A function ``h_i : \mathbb{R}^n \rightarrow \mathbb{R}`` is said to be *smooth* if it is at least continuously differentiable, which is denoted as ``h_i \in C^1``. This means that ``h_i`` and its first derivatives with respect to all variables are continuous.
+$(ebl())
+"""
+
+# ╔═╡ c66343da-4f39-4ca2-9aec-b7bdb3b04209
+cm"""
+$(bbl("Definition",""))
+A curve on a surface `` S `` is defined as a family of points `` x(t) `` that belongs to `` S `` and is continuously parameterized by `` t `` for `` a \leq t \leq b ``. The curve is differentiable if its derivative `` \dot{x} = \frac{d}{dt}x(t) `` exists. Moreover, the curve is said to be twice differentiable if its second derivative `` \ddot{x}(t) `` exists. A curve `` x(t) `` passes through a point `` x^* `` if `` x^* = x(t^*) `` for some `` t^*, a \leq t^* \leq b ``. The derivative of the curve at `` x^* `` is defined as `` \dot{x}(t^*) ``, which is itself a vector in `` E^n ``.
+$(ebl())
+
+##### Remarks:
+1. **Existence of Derivatives**: A curve being differentiable means that at each point `` x(t) ``, there exists a unique tangent vector `` \dot{x}(t) ``, which represents the velocity of a point moving along the curve.
+   
+2. **Twice Differentiability**: If a curve is twice differentiable, then the acceleration `` \ddot{x}(t) `` exists at each point along the curve. This can provide information about the curvature and how the velocity is changing over time.
+
+
+"""
+
+# ╔═╡ 46c4757e-6d74-44da-a5e9-f880c87b73a2
+cm"""
+$(bbl("Definition",""))
+The tangent plane at a point `` x^* `` on a smooth surface `` S `` is defined as the collection of the derivatives at `` x^* `` of all differentiable curves on `` S `` that pass through `` x^* ``. Mathematically, if `` x(t) `` is any differentiable curve on `` S `` such that `` x(t_0) = x^* ``, then the derivative `` x'(t_0) `` lies in the tangent plane at `` x^* ``. The set of all such derivatives forms a subspace of `` E^n ``, where `` n `` is the dimension of the Euclidean space in which `` S `` resides.
+$(ebl())
+
+##### Remarks:
+
+- It serves as the best linear approximation to the surface at the point ``x^*``.
+- The tangent plane is conceptually analogous to the tangent line to a curve at a point in lower dimensions.
+- The dimension of the tangent plane is `` n - 1 `` if `` S `` is a surface in `` E^n ``.
+- The tangent plane can be expressed as an ``(n-1)``-dimensional flat surface that touches the surface `` S `` only at the point `` x^* `` and contains all possible directions in which one can tangentially pass through `` x^* `` on the surface.
+"""
+
+# ╔═╡ fe0ec473-ad3a-45cb-9253-bf920098d1f9
+cm"""
+$(bbl("Definition","")) 
+A point ``\mathbf{x}^*`` satisfying the constraint ``\mathbf{h}\left(\mathbf{x}^*\right)=\mathbf{0}`` is said to be a regular point of the constraint if the gradient vectors ``\boldsymbol{\nabla} h_1\left(\mathbf{x}^*\right), \boldsymbol{\nabla} h_2\left(\mathbf{x}^*\right), \ldots, \boldsymbol{\nabla} h_m\left(\mathbf{x}^*\right)`` are linearly independent.
+$(ebl())
+"""
+
+# ╔═╡ cd3c777a-a9c3-42a9-9757-b7abe1e8eaec
+cm"""
+
+$(post_img("https://www.dropbox.com/scl/fi/f8yhvtjmutmg1g1b1akqg/sec11_2_1.png?rlkey=smwpev2jbroq5db4spthefzc6&raw=1"))
+
+$(post_img("https://www.dropbox.com/scl/fi/vwvcyrh5lwc2347a26vac/sec11_2_2.png?rlkey=ypw34b849uh3copad7fl1zom6&raw=1"))
+
+$(post_img("https://www.dropbox.com/scl/fi/66qs9j04v0nvb2tz2p9a3/sec11_2_3png.png?rlkey=k72yi90l8ax9ltaxwhb3d4hvb&raw=1"))
+
+
+
+"""
+
+# ╔═╡ b27bee24-eca6-4ed5-ba6f-3e437d2722d2
+cm"""
+$(bbl("Theorem",""))
+At a regular point ``\mathbf{x}^*`` of the surface ``S`` defined by ``\mathbf{h}(\mathbf{x})=\mathbf{0}`` the tangent plane is equal to
+```math
+M=\left\{\mathbf{y}: \boldsymbol{\nabla h}\left(\mathbf{x}^*\right) \mathbf{y}=\mathbf{0}\right\} .
+```
+$(ebl())
+"""
+
+# ╔═╡ a41d7397-7d2b-4463-b755-5af96ca1f9ec
+cm"""
+$(bbl("Lemma",""))
+Let ``\mathbf{x}^*`` be a regular point of the constraints ``\mathbf{h}(\mathbf{x})=\mathbf{0}`` and a local extremum point (a minimum or maximum) of ``f`` subject to these constraints. Then all ``\mathbf{y} \in E^n`` satisfying
+```math
+\boldsymbol{\nabla h}\left(\mathbf{x}^*\right) \mathbf{y}=\mathbf{0}
+```
+must also satisfy
+```math
+\boldsymbol{\nabla} f\left(\mathbf{x}^*\right) \mathbf{y}=0 .
+```
+"""
+
+# ╔═╡ 5771615f-3fd1-4e64-a388-f2b7ce333912
+cm"""
+$(bbl("Theorem",""))
+Let ``\mathbf{x}^*`` be a local extremum point of ``f`` subject to the constraints ``\mathbf{h}(\mathbf{x})=\mathbf{0}``. Assume further that ``\mathbf{x}^*`` is a regular point of these constraints. Then there is a ``\boldsymbol{\lambda} \in E^m`` such that
+```math
+\boldsymbol{\nabla} f\left(\mathbf{x}^*\right)+\boldsymbol{\lambda}^T \boldsymbol{\nabla} \mathbf{h}\left(\mathbf{x}^*\right)=\mathbf{0} .
+```
+"""
+
+# ╔═╡ 6e886b23-e749-400c-8b6a-513a39b9b3d8
+cm"""
+$(ex(1))
+Consider the problem
+```math
+\begin{array}{ll}
+\operatorname{minimize} & x_1 x_2+x_2 x_3+x_1 x_3 \\
+\text { subject to } & x_1+x_2+x_3=3 .
+\end{array}
+```
+"""
+
+# ╔═╡ f14fe681-374b-4410-851a-6acbec0886ac
+cm"""
+$(ex("Example 2","(Maximum volume)"))
+Let us consider an example of the type that is now standard in textbooks and which has a structure similar to that of the example above. We seek to construct a cardboard box of maximum volume, given a fixed area of cardboard.
+
+``\operatorname{maximize} \quad x y z``
+
+subject to ``\quad(x y+y z+x z)=\frac{c}{2}``,
+"""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -3394,6 +3904,43 @@ version = "1.4.1+1"
 # ╟─3f66b21e-e20c-4c36-99d8-9ae934b8df0f
 # ╟─a10353ef-7267-41a9-9620-d6829b0b0c6c
 # ╠═8df3e745-dde4-4f85-ba43-ae46ec5e669a
+# ╟─76874d07-9a1a-4b11-9113-9a64634d0d60
+# ╟─5493b23d-3c41-4eac-beed-7d6fa3be7a44
+# ╟─99dd204a-7651-491b-952e-2bc63df29f9d
+# ╟─b1212331-af7b-4e70-a37a-01bd0d9b83bb
+# ╟─2d1ffc90-0764-4924-abcf-b6bb0459206d
+# ╠═13ab542f-3479-43eb-b74e-89ca6bc43d07
+# ╟─a6553f8f-a69c-4bb2-ad1f-81b0392735ba
+# ╟─a4f385ff-2b19-4865-9a77-233a47e323c1
+# ╠═4488ec7f-d21a-4b82-8b3c-4338623efe0c
+# ╟─06417793-dc4b-4dda-a75b-f9fd9373965f
+# ╟─72049611-b9fa-4df0-9cec-c991c1c48254
+# ╟─785ca05d-7154-4ed2-aedd-70fa047fb566
+# ╟─c11a5841-0625-482e-a11b-457ed9e9cc9e
+# ╟─eddd82fc-cc56-4fd3-8d11-2ecd4f836ad3
+# ╠═7b5bf371-b08b-4b46-83c9-db1e353476b3
+# ╟─6ebe6b08-1977-439a-9f69-caae22b7d924
+# ╟─4c488e2a-45e1-4c61-9b51-0fd141f073bc
+# ╠═e5f0dba1-b76c-4481-9bde-6ab1a61088ed
+# ╟─009f418a-e5ac-4a27-b201-f3ae09b37f77
+# ╟─19a39fd1-bfb9-491a-91b0-32e14305e5a3
+# ╟─7fc4b721-05c6-461d-8ca7-e12e05705c88
+# ╟─cc8e5534-b2fa-4a71-b5f3-ac8be99e4cfa
+# ╟─abf84498-d518-4b49-8f01-f414046c63f7
+# ╟─883994a7-c5b8-445d-8ea3-c93800404231
+# ╟─c66343da-4f39-4ca2-9aec-b7bdb3b04209
+# ╟─46c4757e-6d74-44da-a5e9-f880c87b73a2
+# ╟─fe0ec473-ad3a-45cb-9253-bf920098d1f9
+# ╟─cd3c777a-a9c3-42a9-9757-b7abe1e8eaec
+# ╟─b27bee24-eca6-4ed5-ba6f-3e437d2722d2
+# ╟─1009609c-cd68-4459-8d97-03d650f9a26e
+# ╟─a41d7397-7d2b-4463-b755-5af96ca1f9ec
+# ╟─5771615f-3fd1-4e64-a388-f2b7ce333912
+# ╟─7c080ca2-2ff5-420e-9938-df985c84ba66
+# ╟─e676c729-88f8-4198-9a3e-501af9b4a9e2
+# ╟─6e886b23-e749-400c-8b6a-513a39b9b3d8
+# ╟─f14fe681-374b-4410-851a-6acbec0886ac
+# ╠═74b08967-60bb-4e07-afbe-48c79b3a7bb6
 # ╠═3c9eb960-d2b6-11ee-17eb-d9e0160a1c01
 # ╟─0a350a34-3c76-4de1-ad48-c05b0d7cefee
 # ╟─00000000-0000-0000-0000-000000000001
