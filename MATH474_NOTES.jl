@@ -4,6 +4,16 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+end
+
 # ╔═╡ 3c9eb960-d2b6-11ee-17eb-d9e0160a1c01
 begin
 	using CommonMark
@@ -1127,6 +1137,53 @@ the second of these being simply a restatement of the constraints.
 # ╔═╡ e676c729-88f8-4198-9a3e-501af9b4a9e2
 md"# 11.4 EXAMPLES"
 
+# ╔═╡ 0d0172cf-0e68-4951-8281-90a58d7246bd
+md"# 11.5 SECOND-ORDER CONDITIONS"
+
+# ╔═╡ d229347d-deb1-47b2-9b79-0e2c954178ed
+
+
+# ╔═╡ 00896e12-d9ab-48a7-a811-556a089c54dd
+md"# 11.6 EIGENVALUES IN TANGENT SUBSPACE"
+
+# ╔═╡ 54aeeb6e-722c-4b1e-b663-642b98c4ebe8
+let
+	# M = {(y_1,y_2,y_3) | y_1+y_2+y_3=0}
+	e1 = [1;2;-3]
+	e2 = [1;-2;1]
+	e1 = e1/norm(e1)
+	e2 = e2/norm(e2)
+	E = hcat(e1,e2)
+	L = [0 1 1
+	1 0 1
+	1 1 0
+	]
+	E'*L*E
+end
+
+# ╔═╡ 4fecaae5-2de2-495a-9ba9-23034f67c3b4
+md"# 11.8 INEQUALITY CONSTRAINTS"
+
+# ╔═╡ 62730386-1a45-42c2-90a6-677d4fd1a4b4
+cm"""
+We consider now problems of the form
+```math
+\begin{array}{ll}
+\text { minimize } & f(\mathbf{x}) \\
+\text { subject to } & \mathbf{h}(\mathbf{x})=\mathbf{0} \\
+& \mathbf{g}(\mathbf{x}) \leqslant \mathbf{0} .
+\end{array}\tag{OP}
+```
+
+We assume that ``f`` and ``\mathbf{h}`` are as before and that ``\mathbf{g}`` is a ``p``-dimensional function. Initially, we assume ``f, \mathbf{h}, \mathbf{g} \in C^1``.
+"""
+
+# ╔═╡ 56ee63fb-6240-4600-8a5e-021e5aaa7778
+md"## First-Order Necessary Conditions"
+
+# ╔═╡ 2935f74c-7241-4883-9db7-1d8a7806f673
+md"## Second-Order Conditions"
+
 # ╔═╡ 74b08967-60bb-4e07-afbe-48c79b3a7bb6
 let
 	# c=600
@@ -1143,6 +1200,85 @@ let
 	# value.(z)
 	# # solution_summary(model)
 end
+
+# ╔═╡ c4cbe480-5d24-41dd-9d05-eeb5a58c7c6d
+md"# 13.1 PENALTY METHODS"
+
+# ╔═╡ 49d5908b-e66a-4d03-954a-130648cad4fd
+cm"""
+Consider the problem
+```math
+\begin{array}{cl}
+\text { minimize } & f(\mathbf{x}) \\
+\text { subject to } & \mathbf{x} \in S,
+\end{array}\tag{OP}
+```
+where 
+- ``f`` is a continuous function on ``E^n`` and 
+- ``S`` is a constraint set in ``E^n``. 
+"""
+
+# ╔═╡ 6fa1a97e-63fc-4593-a4c9-be7812bd52b1
+cm"""
+The __idea of a penalty function method__ is to replace problem (``(OP)``) by an unconstrained problem of the form
+```math
+\text { minimize } f(\mathbf{x})+c P(\mathbf{x})
+```
+where ``c`` is a positive constant and ``P`` is a function on ``E^n`` satisfying: 
+1. ``P`` is continuous, 
+2. ``P(\mathbf{x}) \geqslant 0`` for all ``\mathbf{x} \in E^n``, and 
+3. ``P(\mathbf{x})=0`` if and only if ``\mathbf{x} \in S``.
+"""
+
+# ╔═╡ d078a735-b140-443f-bf3a-bf0323ac0a8e
+c_values = @bind cvs Slider(1:10:100)
+
+# ╔═╡ 6e9a770e-df93-4023-8609-44aa40cd57e4
+begin
+	gs=[x->x-4,x->2-x]
+	P(x) = 0.5*sum(map(gi->max(0,gi(x)),gs).^2)
+	plot([x->P(x),x->cvs*P(x)],xlims=(-4,8),labels=["c1=1" "c2=$cvs"])
+
+end
+
+# ╔═╡ ef0efe10-7499-4382-a028-bb2da1e532e9
+md"## The Method"
+
+# ╔═╡ ba0c5058-66ec-4cf0-a2f6-1258e22b59c2
+cm"""
+
+The procedure for solving problem (OP) by the penalty function method is this: 
+- Let ``\left\{c_k\right\}, k=1,2, \ldots``, be a sequence tending to infinity such that for each ``k`` 
+```math
+c_k \geqslant 0, c_{k+1}>c_k. 
+```
+- Define the function
+```math
+q(c, \mathbf{x})=f(\mathbf{x})+c P(\mathbf{x})
+```
+
+- For each ``k`` solve the problem
+```math
+\operatorname{minimize} q\left(c_k, \mathbf{x}\right)
+``` 
+obtaining a solution point ``\mathbf{x}_k``.
+
+We assume here that, for each ``k``, we have a solution. This will be true, for example, if ``q(c, \mathbf{x})`` increases unboundedly as ``|\mathbf{x}| \rightarrow \infty``. 
+"""
+
+# ╔═╡ 40bc4360-8801-4e79-a5e4-7a1cb2211259
+md"# Convergence"
+
+# ╔═╡ 35f0e296-9964-43a5-8ab5-d5eee6eaf30f
+cm"""
+Consider the following problem:
+```math
+\begin{aligned}
+& \min x \\
+& \text { subject to }-x+2 \leq 0 .
+\end{aligned}
+```
+"""
 
 # ╔═╡ 0a350a34-3c76-4de1-ad48-c05b0d7cefee
 begin
@@ -1672,6 +1808,170 @@ Let us consider an example of the type that is now standard in textbooks and whi
 ``\operatorname{maximize} \quad x y z``
 
 subject to ``\quad(x y+y z+x z)=\frac{c}{2}``,
+"""
+
+# ╔═╡ 20149276-28c5-4118-a7ea-4d9ee80995ff
+cm"""
+$(bth("Second-Order Necessary Conditions"))
+Suppose that ``\mathbf{x}^*`` is a local minimum of ``f`` subject to ``\mathbf{h}(\mathbf{x})=\mathbf{0}`` and that ``\mathbf{x}^*`` is a regular point of these constraints. Then there is a ``\boldsymbol{\lambda} \in E^m`` such that
+```math
+\boldsymbol{\nabla} f\left(\mathbf{x}^*\right)+\boldsymbol{\lambda}^T \boldsymbol{\nabla} \mathbf{h}\left(\mathbf{x}^*\right)=\mathbf{0} .
+```
+
+If we denote by ``M`` the tangent plane ``M=\left\{\mathbf{y}: \nabla \mathbf{h}\left(\mathbf{x}^*\right) \mathbf{y}=\mathbf{0}\right\}``, then the matrix
+```math
+\mathbf{L}\left(\mathbf{x}^*\right)=\mathbf{F}\left(\mathbf{x}^*\right)+\boldsymbol{\lambda}^T \mathbf{H}\left(\mathbf{x}^*\right)
+```
+is positive semidefinite on ``M``, that is, ``\mathbf{y}^T \mathbf{L}\left(\mathbf{x}^*\right) \mathbf{y} \geqslant \mathbf{0}`` for all ``\mathbf{y} \in M``.
+"""
+
+# ╔═╡ e94f0173-1164-4989-9549-d0fe68b3f5c0
+cm"""
+$(bth("Second-Order Sufficiency Conditions"))
+Suppose there is a point ``\mathbf{x}^*`` satisfying ``\mathbf{h}\left(\mathbf{x}^*\right)=\mathbf{0}``, and ``a \boldsymbol{\lambda} \in E^m`` such that
+```math
+\boldsymbol{\nabla} f\left(\mathbf{x}^*\right)+\boldsymbol{\lambda}^T \boldsymbol{\nabla} \mathbf{h}\left(\mathbf{x}^*\right)=\mathbf{0} .
+```
+
+Suppose also that the matrix ``\mathbf{L}\left(\mathbf{x}^*\right)=\mathbf{F}\left(\mathbf{x}^*\right)+\boldsymbol{\lambda}^T \mathbf{H}\left(\mathbf{x}^*\right)`` is positive definite on ``M=\left\{\mathbf{y}: \nabla \mathbf{h}\left(\mathbf{x}^*\right) \mathbf{y}=\mathbf{0}\right\}``, that is, for ``\mathbf{y} \in M, \mathbf{y} \neq \mathbf{0}`` there holds ``\mathbf{y}^T \mathbf{L}\left(\mathbf{x}^*\right) \mathbf{y}>\mathbf{0}``. Then ``\mathbf{x}^*`` is a strict local minimum of ``f`` subject to ``\mathbf{h}(\mathbf{x})=\mathbf{0}``.
+"""
+
+# ╔═╡ 6883b76e-a077-4a46-a4a0-268c12bfc7e4
+cm"""
+$(ex(1))
+Consider the problem
+```math
+\begin{array}{ll}
+\operatorname{minimize} & x_1 x_2+x_2 x_3+x_1 x_3 \\
+\text { subject to } & x_1+x_2+x_3=3 .
+\end{array}
+```
+"""
+
+# ╔═╡ 10163100-f3b5-41d5-9375-7e1c7bf0ee41
+cm"""
+$(ex(1))
+Consider the problem
+```math
+\begin{array}{ll}
+\operatorname{minimize} & x_1 x_2+x_2 x_3+x_1 x_3 \\
+\text { subject to } & x_1+x_2+x_3=3 .
+\end{array}
+```
+"""
+
+# ╔═╡ f92dd067-db6a-4efc-b2f2-edb21f5165b1
+cm"""
+$(bbl("Definition","Regular point"))
+Let ``\mathbf{x}^*`` be a point satisfying the constraints
+```math
+\mathbf{h}\left(\mathbf{x}^*\right)=\mathbf{0}, \quad \mathbf{g}\left(\mathbf{x}^*\right) \leqslant \mathbf{0},\tag{*}
+```
+and let ``J`` be the set of indices ``j`` for which ``g_j\left(\mathbf{x}^*\right)=0``. Then ``\mathbf{x}^*`` is said to be a regular point of the constraints (``*``) if the gradient vectors ``\nabla h_i\left(\mathbf{x}^*\right), \nabla g_j\left(\mathbf{x}^*\right)``, ``1 \leqslant i \leqslant m, j \in J`` are linearly independent.
+"""
+
+# ╔═╡ 22099668-e2fe-4cf9-a565-d044798c7f55
+cm"""
+$(bth("Karush-Kuhn-Tucker Conditions"))
+ Let ``\mathbf{x}^*`` be a relative minimum point for the problem
+```math
+\begin{aligned}
+\operatorname{minimize} & f(\mathbf{x}) \\
+\text { subject to } & \mathbf{h}(\mathbf{x})=\mathbf{0}, \quad \mathbf{g}(\mathbf{x}) \leqslant \mathbf{0},
+\end{aligned}
+```
+and suppose ``\mathbf{x}^*`` is a regular point for the constraints. Then there is a vector ``\boldsymbol{\lambda} \in E^m`` and a vector ``\boldsymbol{\mu} \in E^p`` with ``\boldsymbol{\mu} \geqslant \mathbf{0}`` such that
+```math
+\begin{aligned}
+\boldsymbol{\nabla} f\left(\mathbf{x}^*\right)+\boldsymbol{\lambda}^T \boldsymbol{\nabla h}\left(\mathbf{x}^*\right)+\boldsymbol{\mu}^T \nabla \mathbf{g}\left(\mathbf{x}^*\right) & =\mathbf{0} \\
+\boldsymbol{\mu}^T \mathbf{g}\left(\mathbf{x}^*\right) & =0 \quad \text{(complementary slackness)}.
+\end{aligned}\tag{**}
+```
+"""
+
+# ╔═╡ b2805e31-bc06-4b92-8738-6e7d902b07cc
+cm"""
+$(example("Example",""))
+Consider the problem
+```math
+\begin{array}{cc}
+\operatorname{minimize} & 2 x_1^2+2 x_1 x_2+x_2^2-10 x_1-10 x_2 \\
+\text { subject to } & x_1^2+x_2^2 \leqslant 5 \\
+& 3 x_1+x_2 \leqslant 6 .
+\end{array}
+```
+"""
+
+# ╔═╡ abbae4e5-1036-4375-933b-06de5c4d3fa8
+cm"""
+$(bth("Second-Order Necessary Conditions"))
+Suppose the functions ``f, \mathbf{g}, \mathbf{h} \in C^2`` and that ``\mathbf{x}^*`` is a regular point of the constraints (33). If ``\mathbf{x}^*`` is a relative minimum point for problem (``*``), then there is a ``\boldsymbol{\lambda} \in E^m, \boldsymbol{\mu} \in E^p, \boldsymbol{\mu} \geqslant \mathbf{0}`` such that (``**``) hold and such that
+```math
+\mathbf{L}\left(\mathbf{x}^*\right)=\mathbf{F}\left(\mathbf{x}^*\right)+\boldsymbol{\lambda}^T \mathbf{H}\left(\mathbf{x}^*\right)+\boldsymbol{\mu}^T \mathbf{G}\left(\mathbf{x}^*\right)
+```
+is positive semidefinite on the tangent subspace of the active constraints at ``\mathbf{x}^*``.
+"""
+
+# ╔═╡ 67183649-eae7-44b2-b1ff-6ab6b25ce921
+cm"""
+$(bth("Second-Order Sufficiency Conditions"))
+Let ``f, \mathbf{g}, \mathbf{h} \in C^2``. Sufficient conditions that a point ``\mathbf{x}^*`` satisfying (``*``) be a strict relative minimum point of problem (OP) is that there exist ``\boldsymbol{\lambda} \in E^m, \boldsymbol{\mu} \in E^p``, such that
+```math
+\begin{gathered}
+\boldsymbol{\mu} \geqslant 0 \\
+\boldsymbol{\mu}^T \mathbf{g}\left(\mathbf{x}^*\right)=0 \\
+\boldsymbol{\nabla} f\left(\mathbf{x}^*\right)+\boldsymbol{\lambda}^T \boldsymbol{\nabla} \mathbf{h}\left(\mathbf{x}^*\right)+\boldsymbol{\mu}^{T_1} \boldsymbol{\nabla} \mathbf{g}\left(\mathbf{x}^*\right)=0,
+\end{gathered}
+```
+and the Hessian matrix
+```math
+\mathbf{L}\left(\mathbf{x}^*\right)=\mathbf{F}\left(\mathbf{x}^*\right)+\boldsymbol{\lambda}^T \mathbf{H}\left(\mathbf{x}^*\right)+\boldsymbol{\mu}^T \mathbf{G}\left(\mathbf{x}^*\right)
+```
+is positive definite on the subspace
+```math
+M^{\prime}=\left\{\mathbf{y}: \boldsymbol{\nabla h}\left(\mathbf{x}^*\right) \mathbf{y}=0, \boldsymbol{\nabla} g_j\left(\mathbf{x}^*\right) \mathbf{y}=0 \text { for all } j \in J\right\},
+```
+where
+```math
+J=\left\{j: g_j\left(\mathbf{x}^*\right)=0, \mu_j>0\right\} .
+```
+"""
+
+# ╔═╡ 79c550bf-2261-4e53-9745-8f9799463e0c
+cm"""
+$(ex(1))
+Suppose ``S`` is defined by a number of inequality constraints:
+```math
+S=\left\{\mathbf{x}: g_i(\mathbf{x}) \leqslant 0, \quad i=1,2, \ldots, p\right\} .
+```
+"""
+
+# ╔═╡ 7887cc80-3112-4485-af18-ae311496342f
+cm"""
+$(bbl("Lemma 1.",""))
+```math
+\begin{aligned}
+q\left(c_k, \mathbf{x}_k\right) & \leqslant q\left(c_{k+1}, \mathbf{x}_{k+1}\right) \\
+P\left(\mathbf{x}_k\right) & \geqslant P\left(\mathbf{x}_{k+1}\right) \\
+f\left(\mathbf{x}_k\right) & \leqslant f\left(\mathbf{x}_{k+1}\right) .
+\end{aligned}
+```
+"""
+
+# ╔═╡ 77c25132-35b0-4dd0-9e24-c5f4186569b3
+cm"""
+$(bbl("Lemma 2",""))
+Let ``\mathbf{x}^*`` be a solution to problem (OP). Then for each ``k``
+```math
+f\left(\mathbf{x}^*\right) \geqslant q\left(c_k, \mathbf{x}_k\right) \geqslant f\left(\mathbf{x}_k\right) .
+```
+"""
+
+# ╔═╡ 5c35cb4c-57f3-44f2-a2d0-8a63ce635b67
+cm"""
+$(bth(""))
+Let ``\left\{\mathbf{x}_k\right\}`` be a sequence generated by the penalty method. Then, any limit point of the sequence is a solution to (OP).
+
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -3940,7 +4240,37 @@ version = "1.4.1+1"
 # ╟─e676c729-88f8-4198-9a3e-501af9b4a9e2
 # ╟─6e886b23-e749-400c-8b6a-513a39b9b3d8
 # ╟─f14fe681-374b-4410-851a-6acbec0886ac
+# ╟─0d0172cf-0e68-4951-8281-90a58d7246bd
+# ╟─20149276-28c5-4118-a7ea-4d9ee80995ff
+# ╟─e94f0173-1164-4989-9549-d0fe68b3f5c0
+# ╟─6883b76e-a077-4a46-a4a0-268c12bfc7e4
+# ╠═d229347d-deb1-47b2-9b79-0e2c954178ed
+# ╟─00896e12-d9ab-48a7-a811-556a089c54dd
+# ╟─10163100-f3b5-41d5-9375-7e1c7bf0ee41
+# ╠═54aeeb6e-722c-4b1e-b663-642b98c4ebe8
+# ╟─4fecaae5-2de2-495a-9ba9-23034f67c3b4
+# ╟─62730386-1a45-42c2-90a6-677d4fd1a4b4
+# ╟─56ee63fb-6240-4600-8a5e-021e5aaa7778
+# ╟─f92dd067-db6a-4efc-b2f2-edb21f5165b1
+# ╟─22099668-e2fe-4cf9-a565-d044798c7f55
+# ╟─b2805e31-bc06-4b92-8738-6e7d902b07cc
+# ╟─2935f74c-7241-4883-9db7-1d8a7806f673
+# ╟─abbae4e5-1036-4375-933b-06de5c4d3fa8
+# ╟─67183649-eae7-44b2-b1ff-6ab6b25ce921
 # ╠═74b08967-60bb-4e07-afbe-48c79b3a7bb6
+# ╟─c4cbe480-5d24-41dd-9d05-eeb5a58c7c6d
+# ╟─49d5908b-e66a-4d03-954a-130648cad4fd
+# ╟─6fa1a97e-63fc-4593-a4c9-be7812bd52b1
+# ╟─79c550bf-2261-4e53-9745-8f9799463e0c
+# ╠═d078a735-b140-443f-bf3a-bf0323ac0a8e
+# ╠═6e9a770e-df93-4023-8609-44aa40cd57e4
+# ╟─ef0efe10-7499-4382-a028-bb2da1e532e9
+# ╟─ba0c5058-66ec-4cf0-a2f6-1258e22b59c2
+# ╟─40bc4360-8801-4e79-a5e4-7a1cb2211259
+# ╟─7887cc80-3112-4485-af18-ae311496342f
+# ╟─77c25132-35b0-4dd0-9e24-c5f4186569b3
+# ╟─5c35cb4c-57f3-44f2-a2d0-8a63ce635b67
+# ╟─35f0e296-9964-43a5-8ab5-d5eee6eaf30f
 # ╠═3c9eb960-d2b6-11ee-17eb-d9e0160a1c01
 # ╟─0a350a34-3c76-4de1-ad48-c05b0d7cefee
 # ╟─00000000-0000-0000-0000-000000000001
